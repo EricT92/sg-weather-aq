@@ -116,31 +116,31 @@ only O11 can be self-hosted). See [ADR 0003](docs/adr/0003-terraform-for-self-ma
 
 ```mermaid
 flowchart TB
-    U[Users] -->|HTTPS| ALB["Application Load Balancer<br/>TLS 1.2/1.3 · HTTP→HTTPS<br/>host-based routing"]
-    subgraph VPC [VPC · 2 AZs]
-        subgraph Public subnets
-            ALB
-            NAT[NAT gateway]
-        end
-        subgraph App subnets
-            DEV["dev: controller + front-end ASG"]
-            QA["qa: controller + front-end ASG"]
-            PROD["prod: controller + front-end ASG (2–4)"]
-            LT["lifetime: LifeTime server"]
-        end
-        subgraph Data subnets · no internet route
-            RDEV[(RDS SQL Server dev)]
-            RQA[(RDS SQL Server qa)]
-            RPROD[(RDS SQL Server prod · Multi-AZ)]
-            RLT[(RDS SQL Server lifetime)]
-        end
-    end
-    ALB --> DEV & QA & PROD & LT
-    DEV --> RDEV
-    QA --> RQA
-    PROD --> RPROD
-    LT --> RLT
-    DEV & QA & PROD & LT -->|HTTPS out| NAT
+U["Users"] -->|"HTTPS"| ALB
+subgraph VPC["VPC, 2 Availability Zones"]
+subgraph PUB["Public subnets"]
+ALB["Application Load Balancer<br/>TLS 1.2/1.3, HTTP to HTTPS<br/>host-based routing"]
+NAT["NAT gateway"]
+end
+subgraph APP["Private app subnets"]
+DEV["dev: controller + front-end ASG"]
+QA["qa: controller + front-end ASG"]
+PROD["prod: controller + front-end ASG (2 to 4)"]
+LT["lifetime: LifeTime server"]
+end
+subgraph DATA["Private data subnets, no internet route"]
+RDEV[("RDS SQL Server dev")]
+RQA[("RDS SQL Server qa")]
+RPROD[("RDS SQL Server prod, Multi-AZ")]
+RLT[("RDS SQL Server lifetime")]
+end
+end
+ALB --> DEV & QA & PROD & LT
+DEV --> RDEV
+QA --> RQA
+PROD --> RPROD
+LT --> RLT
+DEV & QA & PROD & LT -->|"HTTPS out"| NAT
 ```
 
 | Module | What it creates |

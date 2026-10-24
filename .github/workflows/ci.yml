@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform – format, validate, lint, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Format check
+        run: terraform fmt -check -recursive -diff
+
+      - name: Init (no backend, no AWS credentials needed)
+        run: terraform init -backend=false -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Platform tests (mocked AWS provider)
+        run: terraform test
+
+      - name: Module tests (mocked AWS provider)
+        run: |
+          for module in modules/*/; do
+            if [ -d "${module}tests" ]; then
+              echo "::group::${module}"
+              terraform -chdir="${module}" init -backend=false -input=false
+              terraform -chdir="${module}" test
+              echo "::endgroup::"
+            fi
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: TFLint
+        run: |
+          tflint --init
+          tflint --recursive --config "$(pwd)/.tflint.hcl"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  security-scan:
+    name: Checkov – infrastructure security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/terraform
+          framework: terraform
+          config_file: infra/terraform/.checkov.yaml
+
+  e2e:
+    name: Playwright – smoke tests against the deployed app
+    # Runs on demand, because it hits the live OutSystems environment.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report
+
+  outsystems-tests:
+    name: OutSystems BDD tests (live environment)
+    runs-on: ubuntu-latest
+    # Runs on demand: the tests execute inside the live OutSystems environment.
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      OS_ENV_URL: https://personal-s1hc9xux.outsystemscloud.com
+    steps:
+      - name: Run BDDFramework suite through the BDDTestRunner REST API
+        run: |
+          set -euo pipefail
+          url="$OS_ENV_URL/BDDFramework/rest/v1/BDDTestRunner/WeatherAirQuality_Tests/WeatherAirQualityTests"
+          echo "Calling $url"
+          curl -sSf "$url" -o result.json
+          cat result.json
+          echo
+          if [ "$(jq -r '.SuiteSuccess' result.json)" != "true" ]; then
+            echo "::error::BDD suite failed"
+            exit 1
+          fi

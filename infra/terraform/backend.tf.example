@@ -1,0 +1,11 @@
+# Copy to backend.tf to store state remotely (recommended for any shared use).
+# Requires Terraform >= 1.10 for S3-native state locking (use_lockfile).
+terraform {
+  backend "s3" {
+    bucket       = "REPLACE-ME-tfstate-bucket"
+    key          = "outsystems-platform/terraform.tfstate"
+    region       = "ap-southeast-1"
+    encrypt      = true
+    use_lockfile = true
+  }
+}

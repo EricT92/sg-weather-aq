@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is git-ignored.
+aws_region          = "ap-southeast-1"
+project_name        = "outsystems-platform"
+owner               = "platform-team"
+acm_certificate_arn = "arn:aws:acm:ap-southeast-1:123456789012:certificate/REPLACE-ME"
+
+# Restrict non-production access to a corporate range if needed:
+# allowed_ingress_cidrs = ["203.0.113.0/24"]

@@ -1,0 +1,52 @@
+<powershell>
+# ---------------------------------------------------------------------------
+# First-boot bootstrap for an OutSystems 11 server (role: ${role}, env: ${environment}).
+# Uses the community Outsystems.SetupTools PowerShell module to automate the
+# documented installation steps. Check parameters with `Get-Help <cmdlet>`
+# for the module version in use before running against a real environment.
+# ---------------------------------------------------------------------------
+$ErrorActionPreference = "Stop"
+Start-Transcript -Path "C:\outsystems-bootstrap.log" -Append
+
+# 1. Tooling
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+Install-Module -Name Outsystems.SetupTools -Force
+Import-Module Outsystems.SetupTools
+Install-Module -Name AWS.Tools.SecretsManager, AWS.Tools.S3 -Force
+
+# 2. Prerequisites and Platform Server
+Install-OSServerPreReqs -MajorVersion "11"
+Install-OSServer -Version "${outsystems_version}"
+
+# 3. Platform configuration against the RDS SQL Server database.
+#    Credentials are read at runtime from the RDS-managed secret.
+$secret = (Get-SECSecretValue -SecretId "${db_secret_arn}").SecretString | ConvertFrom-Json
+
+%{ if role == "controller" ~}
+New-OSServerConfig -DatabaseProvider "SQL"
+Set-OSServerConfig -SettingSection "PlatformDatabaseConfiguration" -Setting "Server" -Value "${db_host}"
+Set-OSServerConfig -SettingSection "PlatformDatabaseConfiguration" -Setting "Catalog" -Value "outsystems"
+Set-OSServerConfig -Apply -PlatformDBCredential (New-Object PSCredential($secret.username, (ConvertTo-SecureString $secret.password -AsPlainText -Force)))
+
+# 4. Service Center, system components and license (license uploaded to S3 beforehand)
+Read-S3Object -BucketName "${installers_bucket}" -Key "license/${environment}.lic" -File "C:\outsystems\license.lic"
+Install-OSPlatformServiceCenter
+Publish-OSPlatformSystemComponents
+Install-OSPlatformLicense -Path "C:\outsystems\license.lic"
+%{ if is_lifetime ~}
+Publish-OSPlatformLifetime
+%{ endif ~}
+%{ else ~}
+# Front-end: join the farm managed by the deployment controller at ${controller_ip}
+Set-OSServerConfig -SettingSection "ServiceConfiguration" -Setting "CompilerServerHostname" -Value "${controller_ip}"
+Set-OSServerConfig -Apply -PlatformDBCredential (New-Object PSCredential($secret.username, (ConvertTo-SecureString $secret.password -AsPlainText -Force)))
+%{ endif ~}
+
+# 5. Hardening and tuning recommended by OutSystems
+Set-OSServerSecuritySettings
+Set-OSServerPerformanceTunning2
+Start-OSServerServices
+
+Write-Output "Bootstrap complete for ${role} in ${environment}. Logs: ${log_group}"
+Stop-Transcript
+</powershell>

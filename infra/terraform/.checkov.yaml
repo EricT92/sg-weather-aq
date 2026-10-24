@@ -1,1 +1,33 @@
-
+# Accepted risks are skipped explicitly, each with a reason, so the scan stays
+# strict for everything else.
+skip-check:
+  # TLS terminates at the ALB inside a private VPC; end-to-end TLS to IIS is a
+  # documented next step (see README "Future improvements").
+  - CKV_AWS_378
+  # ALB access logs / VPC flow logs need a dedicated log bucket; out of scope
+  # for this assessment, listed as a future improvement.
+  - CKV_AWS_91
+  - CKV2_AWS_11
+  # A public internet-facing ALB is intended (WAF listed as a future improvement).
+  - CKV2_AWS_28
+  # CloudWatch log groups use AWS-managed encryption; a customer-managed KMS key
+  # is a future improvement.
+  - CKV_AWS_158
+  # S3 bucket uses SSE-KMS with the AWS-managed key; event notifications,
+  # cross-region replication and access logging are not needed for installers.
+  - CKV_AWS_145
+  - CKV2_AWS_62
+  - CKV_AWS_144
+  - CKV_AWS_18
+  - CKV2_AWS_61
+  # Port 80 is open on the ALB only to redirect to HTTPS (asserted by tests).
+  - CKV_AWS_260
+  # RDS for SQL Server does not support IAM database authentication.
+  - CKV_AWS_161
+  # Enhanced monitoring and a customer-managed KMS key for Performance Insights
+  # are future improvements.
+  - CKV_AWS_118
+  - CKV_AWS_354
+  # Dev/QA databases are single-AZ by design to save cost; production Multi-AZ
+  # is enforced by the Terraform tests instead.
+  - CKV_AWS_157

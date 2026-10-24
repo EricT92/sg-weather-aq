@@ -1,0 +1,17 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+infra/terraform/backend.tf
+
+# Node / Playwright
+node_modules/
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+
+# OS
+.DS_Store
+Thumbs.db

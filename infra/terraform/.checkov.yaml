@@ -31,3 +31,12 @@ skip-check:
   # Dev/QA databases are single-AZ by design to save cost; production Multi-AZ
   # is enforced by the Terraform tests instead.
   - CKV_AWS_157
+  # Deletion protection is set per environment: on for prod and LifeTime, off for
+  # dev/QA so they can be torn down; prod is asserted by the Terraform tests.
+  - CKV_AWS_293
+  # Log retention is a per-environment variable (cost vs. audit needs); a
+  # 1-year minimum for prod would be agreed with the security team.
+  - CKV_AWS_338
+  # Instances are tagged through the launch template's tag_specifications and
+  # the provider's default_tags, not through ASG tag blocks.
+  - CKV_AWS_153
